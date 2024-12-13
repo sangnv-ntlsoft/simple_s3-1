@@ -50,6 +50,8 @@ public class SimpleS3Plugin implements FlutterPlugin, MethodCallHandler, EventCh
     private EventChannel eventChannel;
     private MethodChannel methodChannel;
     private EventChannel.EventSink events;
+    private static final String TAGTRANS = "Transfer";
+    private boolean isResultSubmitted = false;
 
     public SimpleS3Plugin() {
 
@@ -142,7 +144,7 @@ public class SimpleS3Plugin implements FlutterPlugin, MethodCallHandler, EventCh
             awsPath = s3FolderPath + "/" + fileName;
         }
         ObjectMetadata objectMetadata = new ObjectMetadata();
-        System.out.println(fileName.substring(fileName.lastIndexOf(".")+1));
+        System.out.println(fileName.substring(fileName.lastIndexOf(".") + 1));
         objectMetadata.setContentType(contentType);
 
 
@@ -208,7 +210,6 @@ public class SimpleS3Plugin implements FlutterPlugin, MethodCallHandler, EventCh
             final DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucketName, filePath).withGeneralProgressListener(new Progress());
 
 
-
             Thread thread = new Thread() {
                 @Override
                 public void run() {
@@ -218,7 +219,6 @@ public class SimpleS3Plugin implements FlutterPlugin, MethodCallHandler, EventCh
 
             thread.start();
             parentResult.success(true);
-
 
 
         } catch (Exception e) {
@@ -275,22 +275,34 @@ public class SimpleS3Plugin implements FlutterPlugin, MethodCallHandler, EventCh
         public void onStateChanged(int id, TransferState state) {
             switch (state) {
                 case COMPLETED:
-                    Log.d(TAG, "onStateChanged: \"COMPLETED, ");
-                    parentResult.success(true);
+                    Log.d(TAG, "onStateChanged: COMPLETED");
+                    try {
+                        parentResult.success(true);
+                    } catch (IllegalStateException e) {
+                        Log.e(TAG, "Error: Reply already submitted - " + e.getMessage());
+                    }
                     break;
+
                 case WAITING:
-                    Log.d(TAG, "onStateChanged: \"WAITING, ");
+                    Log.d(TAG, "onStateChanged: WAITING");
                     break;
+
                 case FAILED:
                     invalidateEventSink();
-                    Log.d(TAG, "onStateChanged: \"FAILED, ");
-                    parentResult.success(false);
+                    Log.d(TAG, "onStateChanged: FAILED");
+                    try {
+                        parentResult.success(false);
+                    } catch (IllegalStateException e) {
+                        Log.e(TAG, "Error: Reply already submitted - " + e.getMessage());
+                    }
                     break;
+
                 default:
-                    Log.d(TAG, "onStateChanged: \"SOMETHING ELSE, ");
+                    Log.d(TAG, "onStateChanged: SOMETHING ELSE - " + state);
                     break;
             }
         }
+
 
         @Override
         public void onProgressChanged(int id, long bytesCurrent, long bytesTotal) {
